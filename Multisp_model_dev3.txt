@@ -1,0 +1,60 @@
+ model {
+    #Prior distributions on the community level occupancy
+    #and detection covariates
+    psi.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level occupancy covariates
+    a <- log(psi.mean) - log(1-psi.mean)
+    theta.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level detection covariates
+    b <- log(theta.mean) - log(1-theta.mean)
+    mu.alpha1 ~ dnorm(0, 0.01)
+    tau1 ~ dgamma(10,1) 
+    tau2 ~ dgamma(10,1)
+    tau.alpha1 ~ dgamma(10,1)#Zipkin's original priors
+    rho ~ dunif(-0.99,0.99)
+    var.v <- tau2 /(1.-pow(rho,2))
+    sigma1 <- 1/sqrt(tau1) sigma2 <- 1/sqrt(tau2)
+    
+    for (i in 1:nspp) {
+    #Prior distributions for the occupancy and detection covariates for each species 
+    u[i] ~ dnorm(a, tau1)
+    mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a) 
+    v[i] ~ dnorm(mu.v[i], var.v)
+    alpha1[i] ~ dnorm(mu.alpha1, tau.alpha1)
+    
+    #Estimate the occupancy probability (latent Z matrix) for each species #at each point (i.e., route or site)
+    for (j in 1:nsite) {
+    logit(psi[j,i]) <- u[i] + alpha1[i]*elev[j]
+    mu.psi[j,i] <- psi[j,i]
+    Z[j,i] ~ dbin(psi[j,i], 1)#Z is generally not observed with certainty, instead
+    #we observed data theta[i,j,k] for species i at site j during sampling period k
+    
+    #Estimate the species specific detection probability for every rep at each point where the species occurs (Z=1)
+    for (k in 1:nrep[j]) { 
+    logit(theta[j,k,i]) <- v[i]
+    mu.theta[j,k,i] <- theta[j,k,i]*Z[j,i]
+    X[j,k,i] ~ dbin(mu.theta[j,k,i], 1) 
+    #X is the 3D array of dependent variable: The detection/non-
+    #detection data is defined in a three dimensional
+    #array X where the first dimension, j, is the point; the second #dimension, k, is the rep; and the last dimension, i, is the species.
+    Xnew[j,k,i] ~ dbin(mu.theta[j,k,i], 1) #what is Xnew?
+    #Create simulated dataset to calculate the Bayesian p-value 
+    d[j,k,i] <- abs(X[j,k,i] - mu.theta[j,k,i])
+    dnew[j,k,i] <- abs(Xnew[j,k,i] - mu.theta[j,k,i])
+    d2[j,k,i] <- pow(d[j,k,i],2)
+    dnew2[j,k,i] <- pow(dnew[j,k,i],2)  
+    }
+    dsum[j,i] <- sum(d2[j,1:nrep[j],i])
+    dnewsum[j,i] <- sum(dnew2[j,1:nrep[j],i]) 
+    }
+    }
+    #Calculate the discrepancy measure, which is then defined as the mean(p.fit > p.fitnew)
+    p.fit <- sum(dsum[1:nsite,1:nspp]) 
+    p.fitnew <- sum(dnewsum[1:nsite,1:nspp])
+    #} } }
+    #Estimation of species occupancy (averaged across all the sites)
+    for(i in 1:nspp) {
+    occ_sp[i] <- sum(Z[1:nsite,i])/nsite 
+    }
+    #End model specification
+    }
+    
+
