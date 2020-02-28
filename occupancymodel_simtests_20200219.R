@@ -28,7 +28,14 @@ beta<-rnorm(nspp,0.1,1)
 #p.detect<-matrix(runif(nsites*nspp,0,1),nrow=nsites,ncol=nspp) #detection probs by site and species
   # consider treating this as a beta distribution so that there can be many rare spp and a few common
   # ones as is often the case in the real world
-p.occur<-matrix(inv.logit(rnorm(nsites*nspp,beta*matrix(elevsc,nrow=nsites,ncol=nspp))),nsites,nspp)
+
+p.occur<-matrix(inv.logit(rnorm(n = nsites*nspp
+                                , mean= beta*matrix(elevsc #This is a scaled variable but represents change in occurrence probability with elevation
+                                              , nrow=nsites #each of these has an elevation attached
+                                              , ncol=nspp # I guess this simply recycles the elevation for each species, which has its overall (average) probability of detection given by the beta variable
+                                              ))) #sd for this is 1
+                ,nsites
+                ,nspp)
 p.detect<-matrix(inv.logit(runif(nspp,-2,2)),nsites,nspp,byrow=T)
 Xtrue<-matrix(NA, nsites,nspp) #initialize the true occupancy array
 Xobs<-array(NA, dim=c(nsites,nreps,nspp))
