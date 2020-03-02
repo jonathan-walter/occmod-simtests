@@ -138,12 +138,21 @@ ocmod <- jags.model(file = "Multisp_model_dev3.txt"
                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 
-traceplot(ocmod, varnames="mu.psi") #I think this might not be converence, seems like it's bucking about wildly.
+traceplot(ocmod, varname="mu.psi") #I think this might not be converence, seems like it's bucking about wildly.
 #I don't think the update is paralllelized.
 recompile(ocmod)
 tic()
 is_upd_parll<-autojags(ocmod)
-toc()
+toc() #this took about 2 minutes and I think it did 3 chains for whatever number of iterations 2 times. 
+
+# looking at traceplots I'm not clear that we have convergence.
+traceplot(is_upd_parll, varname="mu.psi")
+
+######
+ocmod.mcmc<-as.mcmc(is_upd_parll)
+gelman.diag(ocmod.mcmc) #this is taking an impressively long time maybe need more thinning? 
+#if I recall correctly this is sort of an ANOVA to compare within-chain and between-chain noisiness.. and the cutoff is somewhere around 1.1... if greater is bad then
+# within/between? I could go back and read up on this.
 
 #I think this just runs another bunch of iterations, can come back to it. 
 update(ocmod, n.iter = nburn)
