@@ -9,7 +9,7 @@ library(rjags)
 library(coda)
 library(stringr)
 
-# library(R2jags)
+library(R2jags)
 library(mcmcse)
 
 logit<-function(x){
@@ -75,8 +75,8 @@ Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of 
 
 #######################Run the model
 nburn = 5000
-n.iter = 10000
-n.chains = 3 #I learned to do at least 3 to assess convergence
+niter = 10000
+nchains = 3 #I learned to do at least 3 to assess convergence
 thin = 10 # this is to deal with autocorrelation in the chains, can come back to it
 
 ###Specify the parameters to be monitored
@@ -120,11 +120,15 @@ sp.inits = function() {
 ocmod <- jags.parallel(data = sp.data
                        , inits = sp.inits
                        , parameters.to.save = sp.params
-                       , model.file = "Multisp_model_dev3.txt"
-                       , n.chains = n.chains
-                       # , n.iter = n.iter
-                       # , n.burnin = nburn
-                       , n.thin = n.thin
+                       , model.file = jaw_model
+                       # have to include object names to export to cluster, 
+                       # I determined the membership of this list by trial and error message
+                       
+                       , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs") 
+                       , n.chains = nchains
+                       , n.iter = niter
+                       , n.burnin = nburn
+                       , n.thin = thin
 ) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 ocmod <- jags.model(file = "Multisp_model_dev3.txt"

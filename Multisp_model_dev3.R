@@ -17,8 +17,9 @@ jaw_model<-function() {
     
     tau.alpha1 ~ dgamma(10,1)#Zipkin's original priors
     rho ~ dunif(-0.99,0.99)
-    var.v <- tau2 /(1-pow(rho,2))
-    sigma1 <- 1/sqrt(tau1) sigma2 <- 1/sqrt(tau2)
+    var.v <- tau2 / (1-(rho^2))
+    sigma1 <- 1/sqrt(tau1) 
+    sigma2 <- 1/sqrt(tau2)
     
     for (i in 1:nspp) {
     #Prior distributions for the occupancy and detection covariates for each species 
