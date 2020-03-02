@@ -11,6 +11,7 @@ library(stringr)
 
 library(R2jags)
 library(mcmcse)
+library(tictoc)
 
 logit<-function(x){
   return(log(x/(1/x)))
@@ -136,6 +137,13 @@ ocmod <- jags.model(file = "Multisp_model_dev3.txt"
                     , data = sp.data
                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
+
+traceplot(ocmod, varnames="mu.psi") #I think this might not be converence, seems like it's bucking about wildly.
+#I don't think the update is paralllelized.
+recompile(ocmod)
+tic()
+is_upd_parll<-autojags(ocmod)
+toc()
 
 #I think this just runs another bunch of iterations, can come back to it. 
 update(ocmod, n.iter = nburn)
