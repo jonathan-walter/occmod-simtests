@@ -5,11 +5,11 @@
 
 rm(list=ls())
 
-#library(rjags)
+library(rjags)
 library(coda)
 library(stringr)
 
-library(R2jags)
+# library(R2jags)
 library(mcmcse)
 
 logit<-function(x){
@@ -115,11 +115,34 @@ sp.inits = function() {
 # Set 3 - use these for the dev3 version
 
 #I think this will fit the model, I think it will do the chains in series lets see if I can find how I did it in parallel
-ocmod <- jags.model(file = "Multisp_model_dev3.txt", inits = sp.inits, data = sp.data, n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
-update(ocmod, n.iter = nburn)
-out <- coda.samples(ocmod, n.iter = n.iter, variable.names = sp.params, thin=thin)
-out.mcmc <- as.mcmc(out[[1]])
+#trying with R2jags::jags.parallel,b ut this meansa  different models epcificiation
 
+ocmod <- jags.parallel(data = sp.data
+                       , inits = sp.inits
+                       , parameters.to.save = sp.params
+                       , model.file = "Multisp_model_dev3.txt"
+                       , n.chains = n.chains
+                       # , n.iter = n.iter
+                       # , n.burnin = nburn
+                       , n.thin = n.thin
+) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
+
+ocmod <- jags.model(file = "Multisp_model_dev3.txt"
+                    , inits = sp.inits
+                    , data = sp.data
+                    , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
+
+
+#I think this just runs another bunch of iterations, can come back to it. 
+update(ocmod, n.iter = nburn)
+#thinning after the fact here... or wait, is coda.samples where the MCMC sampling actually happens?
+out <- coda.samples(ocmod
+                    , n.iter = n.iter
+                    , variable.names = sp.params
+                    , thin=thin)
+
+out.mcmc <- as.mcmc(out[[1]])
+# what is being plotted here
 plot(out)
 H<-heidel.diag(out)
 print(H)
