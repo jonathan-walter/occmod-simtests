@@ -36,6 +36,7 @@ jaw_model<-function() {
             #we observed data theta[i,j,k] for species i at site j during sampling period k
             
             #Estimate the species specific detection probability for every rep at each point where the species occurs (Z=1)
+                #MR: this seems wrong, as detection probability should not change between reps. Will go through slower and see what this model is actually doing!
                 for (k in 1:nrep[j]) { 
                 logit(theta[j,k,i]) <- v[i]
                 mu.theta[j,k,i] <- theta[j,k,i]*Z[j,i]
