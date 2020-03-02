@@ -1,19 +1,16 @@
-## Create simulations to test performance of model 
+######### This is code written by JAW 
+# to simulate data to test the bird occupancy model developed by Jarzyna and Jetz
+
+#load libraries and name a few functions
 
 rm(list=ls())
 
-library(rjags)
+#library(rjags)
 library(coda)
 library(stringr)
 
-## Occupancy only ---------------------------------------------------------------------------------
-
-#simulate a site x reps x spp array of occupancies (0,1) and test whether the model recovers it
-#and the underlying parameters
-
-nsites=20
-nspp=50
-nreps=5
+library(R2jags)
+library(mcmcse)
 
 logit<-function(x){
   return(log(x/(1/x)))
@@ -23,39 +20,68 @@ inv.logit<-function(x){
   return(exp(x)/(1+exp(x)))
 }
 
-elevsc<-c(scale(1:nsites))
-beta<-rnorm(nspp,0.1,1)
+## Create simulations to test performance of model 
+
+## Occupancy only ---------------------------------------------------------------------------------
+
+#simulate a site x reps x spp array of occupancies (0,1) and test whether the model recovers it
+#and the underlying parameters
+
+nsites=20
+nspp=50
+nreps=5
+elevsc<-c(scale(1:nsites)) #sets it so that sites are ordered from lowest to higest, and expressed in units of SD so from -1.6 yo 1.6 or so
+beta<-rnorm(nspp,0.1,1)#This is a scaled variable but represents change in occurrence probability with elevation
+
 #p.detect<-matrix(runif(nsites*nspp,0,1),nrow=nsites,ncol=nspp) #detection probs by site and species
   # consider treating this as a beta distribution so that there can be many rare spp and a few common
   # ones as is often the case in the real world
 
-p.occur<-matrix(inv.logit(rnorm(n = nsites*nspp
-                                , mean= beta*matrix(elevsc #This is a scaled variable but represents change in occurrence probability with elevation
-                                              , nrow=nsites #each of these has an elevation attached
-                                              , ncol=nspp # I guess this simply recycles the elevation for each species, which has its overall (average) probability of detection given by the beta variable
-                                              ))) #sd for this is 1
-                ,nsites
+#This is the actual simulated probability of occurences for each species at each site
+p.occur<-matrix(inv.logit #this is used to rescale everything to 0,1
+                (rnorm(n = nsites*nspp #I guess rnorm gives random deviates from the species beta *elevation, with sd 1
+                          , mean= beta*matrix(elevsc 
+                                        , nrow=nsites #each of these has an elevation attached, elevsc
+                                        , ncol=nspp # I guess this simply recycles the elevation for each species, 
+                                        # which each have their own overall (average) probability of detection given by the beta variable
+                                        ))) 
+                ,nsites #i think this just means have sites as rows and species as columns
                 ,nspp)
-p.detect<-matrix(inv.logit(runif(nspp,-2,2)),nsites,nspp,byrow=T)
+
+p.sum<-apply(p.occur, 2, sum)/20 #average probability of occurrence across sites for each sp.
+min(p.sum) #0.3, still high
+max(p.sum) #0.6, not that much higher! Nothing has low occurence probability. Hmmm. 
+
+p.detect<-matrix(inv.logit(runif(nspp,-2,2)),nsites,nspp,byrow=T) 
+
+p.detect #detection does not vary between sites. It ranges from 
+
+min(p.detect)  #0.12 to 
+max(p.detect)  #0.87
+
+
+#There is much more variation between species in detection than there is in occurence, I think. 
+# This is probably bad for the model esp. b/c the covariate is on occurence
 Xtrue<-matrix(NA, nsites,nspp) #initialize the true occupancy array
 Xobs<-array(NA, dim=c(nsites,nreps,nspp))
 for(site in 1:nsites){ #fill Z with detections
   for(spp in 1:nspp){
-    Xtrue[site,spp]<-rbinom(1,1,p.occur[site,spp])
-    Xobs[site,,spp]<-rbinom(5,1,p.detect[site,spp]*Xtrue[site,spp])
+    Xtrue[site,spp]<-rbinom(1,1,p.occur[site,spp]) #occupancy is 1 bernouli trial 
+    Xobs[site,,spp]<-rbinom(5,1,p.detect[site,spp]*Xtrue[site,spp]) #detection is 5 bernouli trials times occurence
   }
 }
-Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))})
+
+Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of presences at the "site" level, not the repeat observation level
 
 #######################Run the model
 nburn = 5000
 n.iter = 10000
-n.chains = 2
-thin = 10
+n.chains = 3 #I learned to do at least 3 to assess convergence
+thin = 10 # this is to deal with autocorrelation in the chains, can come back to it
 
 ###Specify the parameters to be monitored
-#sp.params = list("Z","mu.psi","theta","p.fit", "p.fitnew")
-sp.params = list("mu.psi")
+sp.params = list("Z","mu.psi","theta","p.fit", "p.fitnew")
+# sp.params = list("mu.psi")
 #Z matrix will store occupancy state
 #mu.psi will store occupancy probabilities matrix
 #mu.theta will store detection probabilities 
@@ -69,6 +95,7 @@ sp.data = list(nspp=nspp, nsite=nsites, nrep=rep(nreps,nsites), X=Xobs, elev=ele
 
 
 # Set 1 - this set of initial values has proven effective, so I'll be using these
+#MR: proven effective as in in your own experiments?
 sp.inits = function() {
   psi.meanGuess = runif(1,0.001,0.99)
   list(psi.mean=psi.meanGuess, theta.mean=runif(1,0.001,0.99),
@@ -87,7 +114,8 @@ sp.inits = function() {
 
 # Set 3 - use these for the dev3 version
 
-ocmod <- jags.model(file = "~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt", inits = sp.inits, data = sp.data, n.chains = n.chains)
+#I think this will fit the model, I think it will do the chains in series lets see if I can find how I did it in parallel
+ocmod <- jags.model(file = "Multisp_model_dev3.txt", inits = sp.inits, data = sp.data, n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 update(ocmod, n.iter = nburn)
 out <- coda.samples(ocmod, n.iter = n.iter, variable.names = sp.params, thin=thin)
 out.mcmc <- as.mcmc(out[[1]])
