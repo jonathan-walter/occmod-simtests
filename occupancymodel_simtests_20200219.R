@@ -218,7 +218,7 @@ gelman.plot(ocmod.mcmc) #all these gelman things have memory issues. Hmmm. Thin 
 
 ocmod.df<-as.data.frame(as.matrix(ocmod.mcmc))
 
-plotPost(ocmod.df$`mu.psi[1,1]`)
+plotPost(ocmod.df$`mu.psi[1,1]`) #this produced a pretty histogram
 
 # Z1<-matrix(Z[1,],nrow=nsites,ncol=nspp)
 # Zavg<-matrix(colMeans(Z),nrow=nsites,ncol=nspp)

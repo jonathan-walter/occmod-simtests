@@ -2,29 +2,37 @@ jaw_model<-function() {
     #Prior distributions on the community level occupancy
     #and detection covariates
     psi.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level occupancy covariates
+    # does ignoring the boundaries matter here?
     
-    a <- log(psi.mean) - log(1-psi.mean)
+    a <- log(psi.mean) - log(1-psi.mean) #this llooks like a logit transformation?
     
     theta.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level detection covariates
+    #theta.mean is the average detection probability?
     
     b <- log(theta.mean) - log(1-theta.mean)
     
     mu.alpha1 ~ dnorm(0, 0.01)
+    #need to figure this one out still
     
     tau1 ~ dgamma(10,1) 
+    #this is the standard deviation (or precision, find out) for the occupancy distribution
     
     tau2 ~ dgamma(10,1)
+    #
     
-    tau.alpha1 ~ dgamma(10,1)#Zipkin's original priors
+    tau.alpha1 ~ dgamma(10,1)#Zipkin's original priors #see if we can track down this code. 
+    
     rho ~ dunif(-0.99,0.99)
+    # what is this!
     var.v <- tau2 / (1-(rho^2))
+     # ahhh!
     sigma1 <- 1/sqrt(tau1) 
     sigma2 <- 1/sqrt(tau2)
     
     for (i in 1:nspp) {
     #Prior distributions for the occupancy and detection covariates for each species 
-        u[i] ~ dnorm(a, tau1)
-        mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a) 
+        u[i] ~ dnorm(a, tau1) #a corresponds to the coefficient on elevation
+        mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a) #b corresponds to beta (species specific detections)
         v[i] ~ dnorm(mu.v[i], var.v)
         alpha1[i] ~ dnorm(mu.alpha1, tau.alpha1)
     
