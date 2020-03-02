@@ -117,7 +117,7 @@ sp.inits = function() {
 
 #I think this will fit the model, I think it will do the chains in series lets see if I can find how I did it in parallel
 #trying with R2jags::jags.parallel,b ut this meansa  different models epcificiation
-
+source("Multisp_model_dev3.R")
 ocmod <- jags.parallel(data = sp.data
                        , inits = sp.inits
                        , parameters.to.save = sp.params
@@ -131,11 +131,11 @@ ocmod <- jags.parallel(data = sp.data
                        , n.burnin = nburn
                        , n.thin = thin
 ) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
-source("Multisp_model_dev3.R")
-ocmod <- jags.model(file = "Multisp_model_dev3.txt"
-                    , inits = sp.inits
-                    , data = sp.data
-                    , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
+
+# ocmod <- jags.model(file = "Multisp_model_dev3.txt"
+#                     , inits = sp.inits
+#                     , data = sp.data
+#                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 
 traceplot(ocmod, varname="mu.psi") #I think this might not be converence, seems like it's bucking about wildly.
@@ -149,10 +149,11 @@ toc() #this took about 2 minutes and I think it did 3 chains for whatever number
 traceplot(is_upd_parll, varname="mu.psi") #also look at thetas, 
 
 ######
-ocmod.mcmc<-as.mcmc(is_upd_parll)
+ocmod.mcmc<-as.mcmc(ocmod)
 gelman.diag(ocmod.mcmc) #this is taking an impressively long time maybe need more thinning? 
 #if I recall correctly this is sort of an ANOVA to compare within-chain and between-chain noisiness.. and the cutoff is somewhere around 1.1... if greater is bad then
 # within/between? I could go back and read up on this.
+# this failed with much longer chains too. 
 
 # eventually got: Error in chol.default(W) : 
 # the leading minor of order 356 is not positive definite
@@ -166,11 +167,18 @@ out <- coda.samples(ocmod
                     , variable.names = sp.params
                     , thin=thin)
 
-out.mcmc <- as.mcmc(out[[1]])
-# what is being plotted here
-plot(out)
-H<-heidel.diag(out)
+# out.mcmc <- as.mcmc(out[[1]])
+# # what is being plotted here
+# plot(out)
+
+#
+quartz()
+plot(ocmod)
+dev.off()
+
+H<-heidel.diag(ocmod) #looks like it says "failed" a lot more than 5% of everything
 print(H)
+
 #G<-gelman.diag(out)
 
 #Z<-out.mcmc[,grepl("Z",colnames(out.mcmc))]
@@ -179,9 +187,9 @@ print(H)
 # plot(c(p.detect),c(theta.med[,1,]))
 # cor(c(p.detect),c(theta.med[,1,]))
 # 
-mu.psi<-out.mcmc[,grepl("mu.psi",colnames(out.mcmc))]
+mu.psi<-ocmod.mcmc[,grepl("*psi*",colnames(ocmod.mcmc))]
 psi.med<-array(apply(mu.psi,2,median),dim=c(nsites,nreps,nspp))
-plot(c(p.occur),c(psi.med[,1,]))
+plot(c(p.occur),c(psi.med[,1,]), xlim=c(0,1), ylim=c(0,1))
 # 
 # Z1<-matrix(Z[1,],nrow=nsites,ncol=nspp)
 # Zavg<-matrix(colMeans(Z),nrow=nsites,ncol=nspp)
