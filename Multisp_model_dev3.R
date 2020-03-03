@@ -31,32 +31,45 @@ jaw_model<-function() {
     
     for (i in 1:nspp) {
     #Prior distributions for the occupancy and detection covariates for each species 
-        u[i] ~ dnorm(a, tau1) #a corresponds to the coefficient on elevation
-        mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a) #b corresponds to beta (species specific detections)
-        v[i] ~ dnorm(mu.v[i], var.v)
-        alpha1[i] ~ dnorm(mu.alpha1, tau.alpha1)
+        u[i] ~ dnorm(a, tau1) # u[i] is the species occupancy "intercept" (grand mean across all sites?)
+         # "a" is the logit tranformation of psi.mean. 
+        # tau1 is the variability in occupancy between species, as this is indexed to sp i
+        
+        mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a) #b not indiexed to i. 
+            # This is a complicated bit having to do with the priors, but I think it ultimately has to do with detection? 
+            # But why is detection related to u[i] which is occupancy? 
+        
+        v[i] ~ dnorm(mu.v[i], var.v) #v[i]  (Species-level detection probability)
+            # is simply a random deviate from normal with mean mu.v[i], sd var.v, which is given by rho and tau2. 
+        
+        alpha1[i] ~ dnorm(mu.alpha1, tau.alpha1) # this is beta! confusing that alpha is beta!
     
     #Estimate the occupancy probability (latent Z matrix) for each species #at each point (i.e., route or site)
         for (j in 1:nsite) {
-            logit(psi[j,i]) <- u[i] + alpha1[i]*elev[j]
-            mu.psi[j,i] <- psi[j,i]
+            logit(psi[j,i]) <- u[i] + alpha1[i]*elev[j] #occupancy probability (psi[j,i]) 
+            # is given by expected speces occupancy (u[i]) and species-specific elevation response (alpha1[i]*elev[j])
+            # the logit transformation is to allow it to be "linearly" related to elevation
+            mu.psi[j,i] <- psi[j,i] #i don't yet know why this occurs
             Z[j,i] ~ dbin(psi[j,i], 1)#Z is generally not observed with certainty, instead
-            #we observed data theta[i,j,k] for species i at site j during sampling period k
+           
+            #latent Z is the result of 1 bernouli trial from each psi[j,i]
             
-            #Estimate the species specific detection probability for every rep at each point where the species occurs (Z=1)
-                #MR: this seems wrong, as detection probability should not change between reps. Will go through slower and see what this model is actually doing!
+            #Estimate the species-specific detection probability, and then the chance that it is observed 
+            # at every rep at each point where the species occurs (Z=1)
                 for (k in 1:nrep[j]) { 
-                logit(theta[j,k,i]) <- v[i]
-                mu.theta[j,k,i] <- theta[j,k,i]*Z[j,i]
-                X[j,k,i] ~ dbin(mu.theta[j,k,i], 1) 
+                logit(theta[j,k,i]) <- v[i]  #we observed data theta[i,j,k] for species i at site j during sampling period k 
+                #I guess the idea here is that theta has to be this 3-d array, even though its values are all given by a species-level detection (v[i])
+                mu.theta[j,k,i] <- theta[j,k,i]*Z[j,i] #multiply by indicator (1 if occupied)
+                X[j,k,i] ~ dbin(mu.theta[j,k,i], 1)  # so mu.theta is the detection parameter
                 #X is the 3D array of dependent variable: The detection/non-
                 #detection data is defined in a three dimensional
-                #array X where the first dimension, j, is the point; the second #dimension, k, is the rep; and the last dimension, i, is the species.
-                Xnew[j,k,i] ~ dbin(mu.theta[j,k,i], 1) #what is Xnew?
-                #Create simulated dataset to calculate the Bayesian p-value 
-                d[j,k,i] <- abs(X[j,k,i] - mu.theta[j,k,i])
-                dnew[j,k,i] <- abs(Xnew[j,k,i] - mu.theta[j,k,i])
-                d2[j,k,i] <- pow(d[j,k,i],2)
+                #array X where the first dimension, j, is the site; the second #dimension, k, is the rep; and the last dimension, 
+                # i, is the species.
+                Xnew[j,k,i] ~ dbin(mu.theta[j,k,i], 1) 
+                #Create second simulated dataset to calculate the Bayesian p-value 
+                d[j,k,i] <- abs(X[j,k,i] - mu.theta[j,k,i]) #difference between observation and detection*occupancy (expected)
+                dnew[j,k,i] <- abs(Xnew[j,k,i] - mu.theta[j,k,i]) # difference between observation in alternate universe and expected
+                d2[j,k,i] <- pow(d[j,k,i],2) #square differences
                 dnew2[j,k,i] <- pow(dnew[j,k,i],2)  
                 }
             dsum[j,i] <- sum(d2[j,1:nrep[j],i])
@@ -65,7 +78,7 @@ jaw_model<-function() {
         }
     #Calculate the discrepancy measure, which is then defined as the mean(p.fit > p.fitnew)
     p.fit <- sum(dsum[1:nsite,1:nspp]) 
-    p.fitnew <- sum(dnewsum[1:nsite,1:nspp])
+    p.fitnew <- sum(dnewsum[1:nsite,1:nspp]) #this is driven by nrep(j) and the detection probablities... what does it tell us?
     #} } }
     #Estimation of species occupancy (averaged across all the sites)
     for(i in 1:nspp) {
