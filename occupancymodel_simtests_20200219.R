@@ -69,7 +69,7 @@ min(p.sum) #0.3, still high
 max(p.sum) #0.6, not that much higher! Nothing has low occurence probability. Hmmm. 
 
 p.detect<-matrix(inv.logit(runif(nspp,-2,2)),nsites,nspp,byrow=T) 
-
+ #wait, does this include the occupancy/detection correlation? I don't think so!
 # p.detect #detection does not vary between sites. It ranges from 
 
 min(p.detect)  #0.12 to 

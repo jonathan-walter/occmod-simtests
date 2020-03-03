@@ -4,14 +4,14 @@ jaw_model<-function() {
     psi.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level occupancy covariates
     # does ignoring the boundaries matter here?
     
-    a <- log(psi.mean) - log(1-psi.mean) #this llooks like a logit transformation?
+    a <- log(psi.mean) - log(1-psi.mean) # logit transformation
     
     theta.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level detection covariates
     #theta.mean is the average detection probability?
     
     b <- log(theta.mean) - log(1-theta.mean)
     
-    mu.alpha1 ~ dnorm(0, 0.01)
+    mu.alpha1 ~ dnorm(0, 0.01) #site-level occupancy average
     #need to figure this one out still
     
     tau1 ~ dgamma(10,1) 
@@ -22,7 +22,7 @@ jaw_model<-function() {
     
     tau.alpha1 ~ dgamma(10,1)#Zipkin's original priors #see if we can track down this code. 
     
-    rho ~ dunif(-0.99,0.99)
+    rho ~ dunif(-0.99,0.99) #why does rho exist? 
     # what is this!
     var.v <- tau2 / (1-(rho^2))
      # ahhh!
@@ -35,9 +35,17 @@ jaw_model<-function() {
          # "a" is the logit tranformation of psi.mean. 
         # tau1 is the variability in occupancy between species, as this is indexed to sp i
         
-        mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a) #b not indiexed to i. 
+        mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a) #subtracting a from u[i] is just centering that variable at 0 
             # This is a complicated bit having to do with the priors, but I think it ultimately has to do with detection? 
             # But why is detection related to u[i] which is occupancy? 
+            # what's going on with the tau2 stuff (sigma2, rho) ?
+            # why not simply dnorm(b, tau2)? 
+        
+        #BECAUSE THIS IS A MODEL THAT IGNORES ABUNDANCE AND ALSO IGNORES COUNTS. so Zipkin et al. 2009 J App Ec 
+        # induced a correlation between detection and occurence, where the link is basically abundance (occupancy/site abundance correlation)
+        #. Because high abundance species are likely to be both easier to detect and more prevalent across the landscape, 
+        # we modelled a correlation ðqÞ between occurrence and detection in the model by allowing ui and vi to be jointly distributed such that 
+        #... (Dorazio & Royle 2005; Kerry & Royle 2008).
         
         v[i] ~ dnorm(mu.v[i], var.v) #v[i]  (Species-level detection probability)
             # is simply a random deviate from normal with mean mu.v[i], sd var.v, which is given by rho and tau2. 
