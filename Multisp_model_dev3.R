@@ -22,7 +22,7 @@ jaw_model<-function() {
     
     tau.alpha1 ~ dgamma(10,1)#Zipkin's original priors #see if we can track down this code. 
     
-    rho ~ dunif(-0.99,0.99) #why does rho exist? 
+    rho ~ dunif(-0.99,0.99) # rho is the correlation coefficient... between abundance and occupancy. Seems like counts could be used to verify this. 
     # what is this!
     var.v <- tau2 / (1-(rho^2))
      # ahhh!
