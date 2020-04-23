@@ -43,20 +43,22 @@ inv.logit<-function(x){
 #simulate a site x reps x spp array of occupancies (0,1) and test whether the model recovers it
 #and the underlying parameters
 
-nsites=20
-nspp=50
-nreps=50 #In the Jarzyna and Jetz material it sounded like there were actually 50 stops anwyays!
+nsites=50 #somewhere in the middle of the ecoregions for which we're fitting the model
+nspp=200 #2/3 of total in our data
+nreps=5 #In the Jarzyna and Jetz material it sounded like there were actually 50 stops anwyays!
 elevsc<-c(scale(1:nsites)) #sets it so that sites are ordered from lowest to higest, and expressed in units of SD so from -1.6 yo 1.6 or so
-# mu.a1<-0.1
-# tau.a1<-1
-beta<-rnorm(nspp,mu.a1,tau.a1)/10 #I just divided by 10 since the number of stops instead of sections #This is a scaled variable but represents change in occurrence probability with elevation
+mu.a1<-0.4
+tau.a1<-0.3
+beta<-rnorm(nspp,mu.a1,tau.a1) #This is a scaled variable but represents change in occurrence probability with elevation
 # rho<-0.3
 # sd.occ<-1
 # av.occ<-0.5
 # sd.det<-1
 # av.det<-0.5
-# 
-# abund<-rnorm(nspp)
+#covariance term
+
+
+abund<-rnorm(nspp, -1.5,.1) #make this smaller than beta
 #I think this is needed to serve as the intercept thing in the model and induce the detection/occupancy correlation
 #p.detect<-matrix(runif(nsites*nspp,0,1),nrow=nsites,ncol=nspp) #detection probs by site and species
   # consider treating this as a beta distribution so that there can be many rare spp and a few common
@@ -70,15 +72,16 @@ p.occur<-matrix(inv.logit #this is used to rescale everything to 0,1
                                         , nrow=nspp #each of these has an elevation attached, elevsc
                                         , ncol=nsites # I guess this simply recycles the elevation for each species, 
                                         # which each have their own overall (average) probability of detection given by the beta variable
-                                        ))) 
+                                        ))+abund)
                 ,nsites #i think this just means have sites as rows and species as columns
                 ,nspp)
 
-p.sum<-apply(p.occur, 2, sum)/20 #average probability of occurrence across sites for each sp.
+p.sum<-apply(p.occur, 2, sum)/50 #.
 min(p.sum) #0.3, still high
 max(p.sum) #0.6, not that much higher! Nothing has low occurence probability. Hmmm. 
-
-p.detect<-matrix(inv.logit(runif(nspp,-2,2))*abund,nsites,nspp,byrow=T) 
+min(p.occur)
+max(p.occur)
+p.detect<-matrix(inv.logit(abund+runif(nspp,0,4)),nsites,nspp,byrow=T) 
  #wait, does this include the occupancy/detection correlation? I don't think so!
 # p.detect #detection does not vary between sites. It ranges from 
 
@@ -97,6 +100,15 @@ for(site in 1:nsites){ #fill Z with detections
   }
 }
 
+siterich<-function(x){sum(x>0)}
+richobs<-apply(Xobs, MARGIN = 1, function(site){siterich(apply(site, MARGIN=2, siterich))})
+summary(richobs)
+
+richtrue<-apply(Xtrue, MARGIN = 1, sum)
+summary(richtrue-richobs)
+
+richobs
+richtrue
 Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of presences at the "site" level, not the repeat observation level
 
 #######################Run the model
@@ -109,7 +121,7 @@ thin = 100 # this is to deal with autocorrelation in the chains, can come back t
 sp.params = list("Z","mu.psi","mu.theta","p.fit", "p.fitnew")
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
-#mu.psi will store occupancy probabilities matrix
+#mu.psi will store occupoccancy probabilities matrix
 #mu.theta will store detection probabilities 
 #p.fit and p.fitnew are required for Bayesian p value
 
@@ -176,7 +188,7 @@ traceplot(is_upd_parll, varname="mu.psi") #also look at thetas,
 
 ######
 ocmod.mcmc<-as.mcmc(is_upd_parll)
-gelman.diag(ocmod.mcmc) #this is taking an impressively long time maybe need more thinning? 
+# gelman.diag(ocmod.mcmc) #this is taking an impressively long time maybe need more thinning? 
 #if I recall correctly this is sort of an ANOVA to compare within-chain and between-chain noisiness.. and the cutoff is somewhere around 1.1... if greater is bad then
 # within/between? I could go back and read up on this.
 # this failed with much longer chains too. 
@@ -202,7 +214,7 @@ quartz()
 plot(is_upd_parll) #Rhats looking close to 1 here!
 #Z is confidently at 0 or 1 for each spp (why are there two? look at model file)
 # colored points overlapping for mu_psi and theta! that's goodl
-dev.off()
+#dev.off()
 
 H<-heidel.diag(ocmod.mcmc) #looks like it says "failed" a lot more than 5% of everything
 print(H)
