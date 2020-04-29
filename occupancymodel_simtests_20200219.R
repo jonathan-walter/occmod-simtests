@@ -163,7 +163,7 @@ nchains = 3 #I learned to do at least 3 to assess convergence
 thin = 10 # These are J&J settings
 
 ###Specify the parameters to be monitored
-sp.params = list("Z","mu.psi","mu.theta","p.fit", "p.fitnew", "mu.alpha1", "psi.mean", "theta.mean")
+sp.params = list("p.fit", "p.fitnew", "beta", "u", "p.sp", "p.sitesp", "psi", "mu.theta")
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
 #mu.psi will store occupoccancy probabilities matrix
@@ -180,9 +180,9 @@ sp.data = list(nspp=nspp, nsite=nsites, nrep=rep(nreps,nsites), X=Xobs, elev=ele
 # Set 1 - this set of initial values has proven effective, so I'll be using these
 #MR: proven effective as in in your own experiments?
 sp.inits = function() {
-  psi.meanGuess = runif(1,0.001,0.99)
-  list(psi.mean=psi.meanGuess, theta.mean=runif(1,0.001,0.99),
-       u=rnorm(nspp), v=rnorm(nspp),
+  
+  list(beta.mean= runif(1,0.001,0.99),  u.mean= runif(1,0.001,0.99), #mu.theta=runif(1,0.001,0.99),
+       p.mean = rnorm(nspp), p.site = rnorm(nspp*nsite),
        Z = Zobs)
 }
 
@@ -221,7 +221,7 @@ ocmod <- jags.parallel(data = sp.data
 #                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 
-traceplot(ocmod, varname="psi.mean") #I think this might not be convergence, seems like it's bucking about wildly.
+traceplot(ocmod, varname="") #I think this might not be convergence, seems like it's bucking about wildly.
 #I don't think the update is paralllelized.
 recompile(ocmod)
 tic()
