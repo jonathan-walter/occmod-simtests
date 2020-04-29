@@ -1,21 +1,21 @@
 Jarzyna_offset<-function() {
     #Prior distributions on the community level occupancy
     #and detection covariates
-    beta.mean ~ dunif(0.001,0.999) #vague prior for the hyperparameter of the community-level occupancy covariates
+    beta.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level occupancy covariates
     # does ignoring the boundaries matter here?
     
     a <- log(beta.mean) - log(1-beta.mean) # logit transformation
     
-    u.mean ~ dunif(0.001,0.999) #
+    u.mean ~ dunif(0.001,0.99) #
     
     q <- log(u.mean) - log(1-u.mean) # logit transformation
     
-    p.mean ~ dunif(0.001,0.999) #vague prior for the hyperparameter of the community-level detection covariates
+    p.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level detection covariates
     #theta.mean is the average detection probability?
     
     b <- log(p.mean) - log(1-p.mean)
     
-    p.site ~ dunif(0.001,0.999) 
+    p.site ~ dunif(0.001,0.99) 
     s <- log(p.site) - log(1-p.site)
     
     # mu.alpha1 ~ dnorm(0, 0.01) #site-level occupancy average
@@ -51,13 +51,13 @@ Jarzyna_offset<-function() {
             # the logit transformation is to allow it to be "linearly" related to elevation
             # mu.psi[j,i] <- psi[j,i] #i don't yet know why this occurs
             Z[j,i] ~ dbin(psi[j,i], 1)#Z is generally not observed with certainty, instead
-            p.st[j] ~ dnorm(s, tau.p2)
+            p.st[j,i] ~ dnorm(s, tau.p2)
             #latent Z is the result of 1 bernouli trial from each psi[j,i]
             
             #Estimate the species-specific detection probability, and then the chance that it is observed 
             # at every rep at each point where the species occurs (Z=1)
                 for (k in 1:nrep[j]) { 
-                logit(theta[j,k,i]) <- p.st[j]+p.sp[j]  # detection theta[i,j,k] given that species species i is poresent at site j during sampling period k 
+                logit(theta[j,k,i]) <- p.st[j,i]+p.sp[i]  # detection theta[i,j,k] given that species species i is poresent at site j during sampling period k 
                 mu.theta[j,k,i] <- theta[j,k,i]*Z[j,i] #multiply by indicator (1 if occupied)
                 X[j,k,i] ~ dbin(mu.theta[j,k,i], 1)  # 
                 #X is the 3D array of dependent variable: The detection/non-

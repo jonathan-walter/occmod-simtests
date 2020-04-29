@@ -70,7 +70,7 @@ nspp=200 #2/3 of total in our data
 nreps=5
 elevsc<-c(scale(1:nsites)) #sets it so that sites are ordered from lowest to higest, and expressed in units of SD so from -1.6 yo 1.6 or so
 mu.a1<--3
-tau.a1<-3
+tau.a1<-2
 beta<-rnorm(nspp,mu.a1,tau.a1) #This is a scaled variable but represents change in occurrence probability with elevation
 # rho<-0.3
 # sd.occ<-1
@@ -163,7 +163,7 @@ nchains = 3 #I learned to do at least 3 to assess convergence
 thin = 10 # These are J&J settings
 
 ###Specify the parameters to be monitored
-sp.params = list("p.fit", "p.fitnew", "beta", "u", "p.sp", "p.sitesp", "psi", "mu.theta")
+sp.params = list("p.fit", "p.fitnew", "beta", "p.sp", "p.sitesp", "psi")
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
 #mu.psi will store occupoccancy probabilities matrix
