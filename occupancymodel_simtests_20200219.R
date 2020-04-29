@@ -9,14 +9,35 @@
 
 # 2) for a given set of occupancies and detections, how many sites and reps do you need to get the job done?
 # 3) right now, it seems like there might be more variation between spp (which have no covariates) than between sites (which have the elevation gradient). 
-  # Will it ever work under these conditions? Does it get harder b/c of this?
+# Will it ever work under these conditions? Does it get harder b/c of this?
 # 4) some technical q's: 
-  # what is our favorite operational convergence criterion? 
-    # R_hat, Gelman-Rubin, Heidler, visual inspection
-  # what should trace plots really look like
-  # will the convergence problems go away with enough time or are they fundamentally about too few data?
-  # How realistic are the simulations? can we add features of realism (i.e. from the BBS data) back in (those that might help model)? 
+# what is our favorite operational convergence criterion? 
+# R_hat, Gelman-Rubin, Heidler, visual inspection
+# what should trace plots really look like
+# will the convergence problems go away with enough time or are they fundamentally about too few data?
+# How realistic are the simulations? can we add features of realism (i.e. from the BBS data) back in (those that might help model)? 
 #load libraries and name a few functions
+
+
+
+#######################
+# revisiting a lot of this 4/29/2020: going to simplify both model and simulation per methods described in J&J 2016 supp. Also, they use G-R Rhat statistic so going to try to match that. Their model is way way simpler.
+
+#For BBS, probability of occurrence was modeled as a linear function of elevation. 
+#Elevation was obtained from the National Elevation Dataset (http://ned.usgs.gov/) and calculated for each 1km block 
+#intersecting the BBS route and averaged across each route. 
+
+#Probability of detection was modeled as an intercept-only model because measurements of 
+#potential detection covariates (e.g., weather conditions) were not available for each segment of BBS routes. . 
+
+#We estimated model parameters using Bayesian analysis. 
+#Bayesian parameter estimation was carried out using program JAGS (Just Another Gibbs Sampler; http://mcmc-jags.sourceforge.net/) 
+#via R (version 3.1.2; https://www.r-project.org/) using the package rjags (https://cran.r-project.org/web/packages/rjags/index.html). 
+#Vague priors were used for means and variances of the community-level hyper-parameters. 
+#For each dataset, we ran three parallel chains of length 20,000, discarding the first 5,000 iterations as burn-in, 
+#and used a thinning rate of 10. Convergence was assessed by visual inspection of traceplots and by using the 
+#Gelman-Rubin convergence diagnostic [7] with all diagnostic values <1.1. 
+
 
 rm(list=ls())
 
@@ -27,6 +48,7 @@ library(stringr)
 library(R2jags) #I added this one for jags.paralllel which lets you run the mcmc chains in parallel
 library(mcmcse)
 library(tictoc)
+library(tidyverse)
 
 logit<-function(x){
   return(log(x/(1/x)))
@@ -45,10 +67,10 @@ inv.logit<-function(x){
 
 nsites=50 #somewhere in the middle of the ecoregions for which we're fitting the model
 nspp=200 #2/3 of total in our data
-nreps=5 #In the Jarzyna and Jetz material it sounded like there were actually 50 stops anwyays!
+nreps=5
 elevsc<-c(scale(1:nsites)) #sets it so that sites are ordered from lowest to higest, and expressed in units of SD so from -1.6 yo 1.6 or so
-mu.a1<-0.4
-tau.a1<-0.3
+mu.a1<--3
+tau.a1<-3
 beta<-rnorm(nspp,mu.a1,tau.a1) #This is a scaled variable but represents change in occurrence probability with elevation
 # rho<-0.3
 # sd.occ<-1
@@ -58,35 +80,54 @@ beta<-rnorm(nspp,mu.a1,tau.a1) #This is a scaled variable but represents change 
 #covariance term
 
 
-abund<-rnorm(nspp, -1.5,.1) #make this smaller than beta
+# abund<-rnorm(nspp, -4,3) #make this smaller than beta
 #I think this is needed to serve as the intercept thing in the model and induce the detection/occupancy correlation
 #p.detect<-matrix(runif(nsites*nspp,0,1),nrow=nsites,ncol=nspp) #detection probs by site and species
-  # consider treating this as a beta distribution so that there can be many rare spp and a few common
-  # ones as is often the case in the real world
+# consider treating this as a beta distribution so that there can be many rare spp and a few common
+# ones as is often the case in the real world
 
 #This is the actual simulated probability of occurences for each species at each site
 p.occur<-matrix(inv.logit #this is used to rescale everything to 0,1
                 (rnorm(n = nsites*nspp #I guess rnorm gives random deviates from the species beta *elevation, with sd 1
-                          #, mean=abund+ 
-                       , beta*matrix(elevsc 
-                                        , nrow=nspp #each of these has an elevation attached, elevsc
-                                        , ncol=nsites # I guess this simply recycles the elevation for each species, 
-                                        # which each have their own overall (average) probability of detection given by the beta variable
-                                        ))+abund)
+                       , mean = beta*t(matrix(elevsc 
+                                            , ncol = nsites #each of these has an elevation attached, elevsc
+                                            , nrow = nspp # I guess this simply recycles the elevation for each species, 
+                                             # which each have their own overall (average) probability of detection given by the beta variable
+                       ))
+                       , sd=0.1
+                )
+                )
                 ,nsites #i think this just means have sites as rows and species as columns
                 ,nspp)
 
-p.sum<-apply(p.occur, 2, sum)/50 #.
-min(p.sum) #0.3, still high
-max(p.sum) #0.6, not that much higher! Nothing has low occurence probability. Hmmm. 
-min(p.occur)
-max(p.occur)
-p.detect<-matrix(inv.logit(abund+runif(nspp,0,4)),nsites,nspp,byrow=T) 
- #wait, does this include the occupancy/detection correlation? I don't think so!
-# p.detect #detection does not vary between sites. It ranges from 
+# apply(p.occur, 1, sum)
+# apply(p.occur, 2, sum)
+# 
+# max(apply(p.detect, 1, sum))
+# max(apply(p.detect, 2, sum))
+# 
+# p.sum<-apply(p.occur, 2, sum) #.
+# min(p.sum) #0.3, still high
+# max(p.sum) #0.6, not that much higher! Nothing has low occurence probability. Hmmm. 
+# min(p.occur)
+# max(p.occur)
+tau.p1<-1
+tau.p2<-2
+p.site_off<-rnorm(nsites, sd= tau.p1)
+p.spp_det<-rnorm(nspp, sd=tau.p2)
 
-min(p.detect)  #0.12 to 
-max(p.detect)  #0.87
+p.detect<-matrix(NA, nsites, nspp )
+for(sp in 1:nspp){
+  for(site in 1:nsites){
+    p.detect[site, sp]<-inv.logit(p.site_off[site]+p.spp_det[sp])
+  }
+}
+#wait, does this include the occupancy/detection correlation? I don't think so!
+# p.detect #detection does not vary between sites. It ranges from 
+# mean(p.detect)
+# mean(p.occur)
+# min(p.detect)  #0.12 to 
+# max(p.detect)  #0.87
 
 
 #There is much more variation between species in detection than there is in occurence, I think. 
@@ -103,8 +144,12 @@ for(site in 1:nsites){ #fill Z with detections
 siterich<-function(x){sum(x>0)}
 richobs<-apply(Xobs, MARGIN = 1, function(site){siterich(apply(site, MARGIN=2, siterich))})
 summary(richobs)
-
+Xtrue
 richtrue<-apply(Xtrue, MARGIN = 1, sum)
+summary(richtrue)
+siteocc<-apply(Xtrue, MARGIN = 2, sum)
+summary(siteocc)
+siteocc #not enough variation in species occupancy rates. 
 summary(richtrue-richobs)
 
 richobs
@@ -113,12 +158,12 @@ Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of 
 
 #######################Run the model
 nburn = 5000
-niter = 10000
+niter = 2e4
 nchains = 3 #I learned to do at least 3 to assess convergence
-thin = 100 # this is to deal with autocorrelation in the chains, can come back to it
+thin = 10 # These are J&J settings
 
 ###Specify the parameters to be monitored
-sp.params = list("Z","mu.psi","mu.theta","p.fit", "p.fitnew")
+sp.params = list("Z","mu.psi","mu.theta","p.fit", "p.fitnew", "mu.alpha1", "psi.mean", "theta.mean")
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
 #mu.psi will store occupoccancy probabilities matrix
@@ -176,18 +221,19 @@ ocmod <- jags.parallel(data = sp.data
 #                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 
-traceplot(ocmod, varname="mu.psi") #I think this might not be convergence, seems like it's bucking about wildly.
+traceplot(ocmod, varname="psi.mean") #I think this might not be convergence, seems like it's bucking about wildly.
 #I don't think the update is paralllelized.
 recompile(ocmod)
 tic()
-is_upd_parll<-autojags(ocmod)
+is_upd_parll<-autojags(ocmod, n.update=150, parallel=T, verbose=T)
 toc() #this took about 2 minutes and I think it did 3 chains for whatever number of iterations 2 times. 
 
 # looking at traceplots I'm not clear that we have convergence.
-traceplot(is_upd_parll, varname="mu.psi") #also look at thetas, 
+traceplot(is_upd_parll, varname="psi.mean") #also look at thetas, 
 
 ######
-ocmod.mcmc<-as.mcmc(is_upd_parll)
+# load("messyfit.RData")
+# ocmod.mcmc<-as.mcmc(is_upd_parll, thin=1000)
 # gelman.diag(ocmod.mcmc) #this is taking an impressively long time maybe need more thinning? 
 #if I recall correctly this is sort of an ANOVA to compare within-chain and between-chain noisiness.. and the cutoff is somewhere around 1.1... if greater is bad then
 # within/between? I could go back and read up on this.
@@ -216,7 +262,9 @@ plot(is_upd_parll) #Rhats looking close to 1 here!
 # colored points overlapping for mu_psi and theta! that's goodl
 #dev.off()
 
+newmcmc<-as.mcmc(ocmod)
 H<-heidel.diag(ocmod.mcmc) #looks like it says "failed" a lot more than 5% of everything
+heidel.diag(newmcmc)
 print(H)
 #this is helpful when going back b/c it informs how many iterations are actually informative, too. 
 
@@ -242,9 +290,19 @@ ocmod.df<-as.data.frame(as.matrix(ocmod.mcmc))
 
 plotPost(ocmod.df$`mu.psi[1,1]`) #this produced a pretty histogram
 
+plotPost(ocmod.df$psi.mean)
+mean(p.occur) #model underestimates
+plotPost(ocmod.df$theta.mean)
+mean(p.detect) #pretty darn close, slightly underestimates
+
+plotPost(ocmod.df$mu.alpha1)
+
+mu.a1 #model underestimates some.
+
+
 # Z1<-matrix(Z[1,],nrow=nsites,ncol=nspp)
-# Zavg<-matrix(colMeans(Z),nrow=nsites,ncol=nspp)
-# Zmed<-matrix(apply(Z,2,median),nrow=nsites,ncol=nspp)
+Zavg<-matrix(colMeans(Z),nrow=nsites,ncol=nspp)
+Zmed<-matrix(apply(Z,2,median),nrow=nsites,ncol=nspp)
 # sum(abs(Zobs-Zmed))
 # sum(abs(Xtrue-Zmed))
 

@@ -1,56 +1,40 @@
-jaw_model<-function() {
+Jarzyna_offset<-function() {
     #Prior distributions on the community level occupancy
     #and detection covariates
-    psi.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level occupancy covariates
+    psi.mean ~ dunif(0.001,0.999) #vague prior for the hyperparameter of the community-level occupancy covariates
     # does ignoring the boundaries matter here?
     
     a <- log(psi.mean) - log(1-psi.mean) # logit transformation
     
-    theta.mean ~ dunif(0.001,0.99) #vague prior for the hyperparameter of the community-level detection covariates
+    p.mean ~ dunif(0.001,0.999) #vague prior for the hyperparameter of the community-level detection covariates
     #theta.mean is the average detection probability?
     
-    b <- log(theta.mean) - log(1-theta.mean)
+    b <- log(p.mean) - log(1-p.mean)
     
-    mu.alpha1 ~ dnorm(0, 0.01) #site-level occupancy average
+    # mu.alpha1 ~ dnorm(0, 0.01) #site-level occupancy average
     #need to figure this one out still
     
-    tau1 ~ dgamma(10,1) 
     #this is the standard deviation (or precision, find out) for the occupancy distribution
+    tau.alpha1 ~ dgamma(10,1) 
+  
     
-    tau2 ~ dgamma(10,1)
-    #
+    tau.p1 ~ dgamma(10,1) #detection offset variability between sites 
+    tau.p2 ~ dgamma(10,1) #detection variability between species 
     
-    tau.alpha1 ~ dgamma(10,1)#Zipkin's original priors #see if we can track down this code. 
-    
-    rho ~ dunif(-0.99,0.99) # rho is the correlation coefficient... between abundance and occupancy. Seems like counts could be used to verify this. 
-    # what is this!
-    var.v <- tau2 / (1-(rho^2))
-     # ahhh!
-    sigma1 <- 1/sqrt(tau1) 
-    sigma2 <- 1/sqrt(tau2)
+    sigma.alpha1 <- 1/sqrt(tau.alpha1) 
+    sigma.p2 <- 1/sqrt(tau.p2)
+    sigma.p1 <- 1/sqrt(tau.p1)
     
     for (i in 1:nspp) {
     #Prior distributions for the occupancy and detection covariates for each species 
-        u[i] ~ dnorm(a, tau1) # u[i] is the species occupancy "intercept" (grand mean across all sites?)
-         # "a" is the logit tranformation of psi.mean. 
-        # tau1 is the variability in occupancy between species, as this is indexed to sp i
+        beta[i] ~ dnorm(a, tau.alpha1) # u[i] is the species occupancy "intercept" (grand mean across all sites?)
+       
         
-        mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a) #subtracting a from u[i] is just centering that variable at 0 
-            # This is a complicated bit having to do with the priors, but I think it ultimately has to do with detection? 
-            # But why is detection related to u[i] which is occupancy? 
-            # what's going on with the tau2 stuff (sigma2, rho) ?
-            # why not simply dnorm(b, tau2)? 
         
-        #BECAUSE THIS IS A MODEL THAT IGNORES ABUNDANCE AND ALSO IGNORES COUNTS. so Zipkin et al. 2009 J App Ec 
-        # induced a correlation between detection and occurence, where the link is basically abundance (occupancy/site abundance correlation)
-        #. Because high abundance species are likely to be both easier to detect and more prevalent across the landscape, 
-        # we modelled a correlation ðqÞ between occurrence and detection in the model by allowing ui and vi to be jointly distributed such that 
-        #... (Dorazio & Royle 2005; Kerry & Royle 2008).
-        
-        v[i] ~ dnorm(mu.v[i], var.v) #v[i]  (Species-level detection probability)
+        p[i] ~ dnorm(, var.v) #v[i]  (Species-level detection probability)
             # is simply a random deviate from normal with mean mu.v[i], sd var.v, which is given by rho and tau2. 
         
-        alpha1[i] ~ dnorm(mu.alpha1, tau.alpha1) # this is beta! confusing that alpha is beta!
+        # alpha1[i] ~ dnorm(mu.alpha1, tau.alpha1) # this is beta! confusing that alpha is beta!
     
     #Estimate the occupancy probability (latent Z matrix) for each species #at each point (i.e., route or site)
         for (j in 1:nsite) {
