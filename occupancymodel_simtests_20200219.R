@@ -163,14 +163,18 @@ nchains = 3 #I learned to do at least 3 to assess convergence
 thin = 10 # These are J&J settings
 
 ###Specify the parameters to be monitored
-sp.params = list( "beta", "psi", "mu.theta", "Z")
+sp.params = as.character(list( "beta", "psi", "Z", "p.mean", "p.site", "u.mean", "p.fit", "p.fitnew"))
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
-#mu.psi will store occupoccancy probabilities matrix
-#mu.theta will store detection probabilities 
+#beta is the species-specific elevation sensitivities
+# u.mean is the species-specific random intercept for occurence
+# psi is overall site occurence probability (consider skipping if memory issues persist?)
+#p.mean is the species random intercept for detection
+# p.site is the site random intercept for ddeteciton. 
+
+
 #p.fit and p.fitnew are required for Bayesian p value
 
-sp.params <- as.character(sp.params)
 
 sp.data = list(nspp=nspp, nsite=nsites, nrep=rep(nreps,nsites), X=Xobs, elev=elevsc)
 
@@ -201,7 +205,7 @@ sp.inits = function() {
 #trying with R2jags::jags.parallel,b ut this meansa  different models epcificiation
 source("Multisp_model_dev3.R")
 
-ocmod <- jags.parallel(data = sp.data
+ocmod2 <- jags.parallel(data = sp.data
                        , inits = sp.inits
                        , parameters.to.save = sp.params
                        , model.file = Jarzyna_offset
@@ -213,6 +217,21 @@ ocmod <- jags.parallel(data = sp.data
                        , n.iter = niter
                        , n.burnin = nburn
                        , n.thin = thin
+) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
+
+sp.params_nest = as.character(list( "beta", "psi", "Z", "p.mean", "u.mean", "p.fit", "p.fitnew"))
+ocmod_nest <- jags.parallel(data = sp.data
+                        , inits = sp.inits
+                        , parameters.to.save = sp.params_nest
+                        , model.file = Jarzyna_nested
+                        # have to include object names to export to cluster, 
+                        # I determined the membership of this list by trial and error message
+                        
+                        , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs") 
+                        , n.chains = nchains
+                        , n.iter = niter
+                        , n.burnin = nburn
+                        , n.thin = thin
 ) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 # ocmod <- jags.model(file = "Multisp_model_dev3.txt"
@@ -262,7 +281,7 @@ plot(is_upd_parll) #Rhats looking close to 1 here!
 # colored points overlapping for mu_psi and theta! that's goodl
 #dev.off()
 
-newmcmc<-as.mcmc(ocmod)
+newmcmc<-as.mcmc(ocmod2)
 H<-heidel.diag(ocmod.mcmc) #looks like it says "failed" a lot more than 5% of everything
 heidel.diag(newmcmc)
 print(H)
