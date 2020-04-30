@@ -163,7 +163,7 @@ nchains = 3 #I learned to do at least 3 to assess convergence
 thin = 10 # These are J&J settings
 
 ###Specify the parameters to be monitored
-sp.params = list("p.fit", "p.fitnew", "beta", "p.sp", "p.sitesp", "psi")
+sp.params = list( "beta", "psi", "mu.theta", "Z")
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
 #mu.psi will store occupoccancy probabilities matrix
@@ -221,7 +221,7 @@ ocmod <- jags.parallel(data = sp.data
 #                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 
-traceplot(ocmod, varname="") #I think this might not be convergence, seems like it's bucking about wildly.
+traceplot(ocmod, varname="beta") #I think this might not be convergence, seems like it's bucking about wildly.
 #I don't think the update is paralllelized.
 recompile(ocmod)
 tic()
@@ -272,7 +272,8 @@ print(H)
 
 #G<-gelman.diag(out)
 
-Z<-ocmod.mcmc[,grepl("Z",colnames(ocmod.mcmc))]
+# Z<-ocmod.mcmc[,grepl("Z",colnames(ocmod.mcmc))]
+Z<-newmcmc[,grepl("Z",colnames(newmcmc))]
 # theta<-out.mcmc[,grepl("theta",colnames(out.mcmc))]
 # theta.med<-array(apply(theta,2,mean),dim=c(nsites,nreps,nspp))
 # plot(c(p.detect),c(theta.med[,1,]))
@@ -283,14 +284,15 @@ psi.med<-array(apply(mu.psi,2,median),dim=c(nsites,nreps,nspp))
 plot(c(p.occur),c(psi.med[,1,]), xlim=c(0,1), ylim=c(0,1))
 # 
 
-gelman.plot(ocmod.mcmc) #all these gelman things have memory issues. Hmmm. Thin more?
+gelman.plot(newmcmc) #all these gelman things have memory issues. Hmmm. Thin more?
 ######## not sure how to work with my data here!
 
-ocmod.df<-as.data.frame(as.matrix(ocmod.mcmc))
+# ocmod.df<-as.data.frame(as.matrix(ocmod.mcmc))
+ocmod.df<-as.data.frame(as.matrix(newmcmc))
+ocmod.df
+plotPost(ocmod.df$psi[1,1]) #this produced a pretty histogram
 
-plotPost(ocmod.df$`mu.psi[1,1]`) #this produced a pretty histogram
-
-plotPost(ocmod.df$psi.mean)
+plotPost(ocmod.df$p.mean)
 mean(p.occur) #model underestimates
 plotPost(ocmod.df$theta.mean)
 mean(p.detect) #pretty darn close, slightly underestimates
