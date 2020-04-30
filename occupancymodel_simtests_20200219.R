@@ -113,8 +113,8 @@ p.occur<-matrix(inv.logit #this is used to rescale everything to 0,1
 # max(p.occur)
 tau.p1<-1
 tau.p2<-2
-p.site_off<-rnorm(nsites, sd= tau.p1)
-p.spp_det<-rnorm(nspp, sd=tau.p2)
+p.site_off<-rnorm(nsites, mean=1, sd= tau.p1)
+p.spp_det<-rnorm(nspp, mean=2, sd=tau.p2)
 
 p.detect<-matrix(NA, nsites, nspp )
 for(sp in 1:nspp){
@@ -182,7 +182,7 @@ sp.data = list(nspp=nspp, nsite=nsites, nrep=rep(nreps,nsites), X=Xobs, elev=ele
 sp.inits = function() {
   
   list(beta.mean= runif(1,0.001,0.99),  u.mean= runif(1,0.001,0.99), #mu.theta=runif(1,0.001,0.99),
-       p.mean = rnorm(nspp), p.site = rnorm(nspp*nsite),
+       p.mean = runif(1,0.001,0.99), p.site = runif(1,0.001,0.99),
        Z = Zobs)
 }
 
@@ -204,7 +204,7 @@ source("Multisp_model_dev3.R")
 ocmod <- jags.parallel(data = sp.data
                        , inits = sp.inits
                        , parameters.to.save = sp.params
-                       , model.file = jaw_model
+                       , model.file = Jarzyna_offset
                        # have to include object names to export to cluster, 
                        # I determined the membership of this list by trial and error message
                        
