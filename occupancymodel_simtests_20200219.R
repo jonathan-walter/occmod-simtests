@@ -240,16 +240,16 @@ ocmod_nest <- jags.parallel(data = sp.data
 #                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 
-traceplot(ocmod, varname="beta") #I think this might not be convergence, seems like it's bucking about wildly.
+traceplot(ocmod_nest, varname="p.mean") #I think this might not be convergence, seems like it's bucking about wildly.
 #I don't think the update is paralllelized.
-recompile(ocmod)
+recompile(ocmod_nest)
 tic()
-is_upd_parll<-autojags(ocmod, n.update=150, parallel=T, verbose=T)
+is_upd_parll<-autojags(ocmod_nest, n.update=150, parallel=T, verbose=T)
 toc() #this took about 2 minutes and I think it did 3 chains for whatever number of iterations 2 times. 
 
 # looking at traceplots I'm not clear that we have convergence.
 traceplot(is_upd_parll, varname="psi.mean") #also look at thetas, 
-
+View(is_upd_parll$BUGSoutput$summary)
 ######
 # load("messyfit.RData")
 # ocmod.mcmc<-as.mcmc(is_upd_parll, thin=1000)
