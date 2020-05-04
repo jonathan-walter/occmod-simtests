@@ -132,16 +132,16 @@ Jarzyna_offset<-function() {
     sigma.p1 <- 1/sqrt(tau.p1)
     
     for (i in 1:nspp) {
-        #Prior distributions for the occupancy and detection covariates for each species 
+    #Prior distributions for the occupancy and detection covariates for each species 
         beta[i] ~ dnorm(a, tau.beta) # beta[i] is the species sensitivity to elevation
-        
+       
         u[i] ~ dnorm(q, tau.u) # u[i] is the species occupancy "intercept" (grand mean across all sites?)
         
         p.sp[i] ~ dnorm(b, tau.p1) #v[i]  (Species-level detection probability)
-        # is simply a random deviate from normal with mean mu.v[i], sd var.v, which is given by rho and tau2. 
+            # is simply a random deviate from normal with mean mu.v[i], sd var.v, which is given by rho and tau2. 
         
         
-        #Estimate the occupancy probability (latent Z matrix) for each species #at each point (i.e., route or site)
+    #Estimate the occupancy probability (latent Z matrix) for each species #at each point (i.e., route or site)
         for (j in 1:nsite) {
             logit(psi[j,i]) <- u[i] + beta[i]*elev[j] #occupancy probability (psi[j,i]) 
             # is given by expected species occupancy (u[i]) and species-specific elevation response (beta[i]*elev[j]) #elev[j] comes from data
@@ -153,7 +153,7 @@ Jarzyna_offset<-function() {
             
             #Estimate the species-specific detection probability, and then the chance that it is observed 
             # at every rep at each point where the species occurs (Z=1)
-            for (k in 1:nrep[j]) { 
+                for (k in 1:nrep[j]) { 
                 logit(theta[j,k,i]) <- p.st[j,i]+p.sp[i]  # detection theta[i,j,k] given that species species i is poresent at site j during sampling period k 
                 mu.theta[j,k,i] <- theta[j,k,i]*Z[j,i] #multiply by indicator (1 if occupied)
                 X[j,k,i] ~ dbin(mu.theta[j,k,i], 1)  # 
@@ -167,22 +167,22 @@ Jarzyna_offset<-function() {
                 dnew[j,k,i] <- abs(Xnew[j,k,i] - mu.theta[j,k,i]) # difference between observation in alternate universe and expected
                 d2[j,k,i] <- pow(d[j,k,i],2) #square differences
                 dnew2[j,k,i] <- pow(dnew[j,k,i],2)  
-            }
+                }
             dsum[j,i] <- sum(d2[j,1:nrep[j],i])
             dnewsum[j,i] <- sum(dnew2[j,1:nrep[j],i]) 
+            }
         }
-    }
     #Calculate the discrepancy measure, which is then defined as the mean(p.fit > p.fitnew)
     p.fit <- sum(dsum[1:nsite,1:nspp]) 
     p.fitnew <- sum(dnewsum[1:nsite,1:nspp]) #this is driven by nrep(j) and the detection probablities... what does it tell us?
     #} } }
     #Estimation of species occupancy (averaged across all the sites)
     for(i in 1:nspp) {
-        occ_sp[i] <- sum(Z[1:nsite,i])/nsite 
+    occ_sp[i] <- sum(Z[1:nsite,i])/nsite 
     }
     #End model specification
-}
-
+    }
+    
 Jarzyna_nested<-function() {
     #Prior distributions on the community level occupancy
     #and detection covariates
