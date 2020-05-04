@@ -51,7 +51,7 @@ library(tictoc)
 library(tidyverse)
 
 logit<-function(x){
-  return(log(x/(1/x)))
+  return(log(x/(1-x)))
 }
 
 inv.logit<-function(x){
@@ -66,10 +66,14 @@ nsites=50 #somewhere in the middle of the ecoregions for which we're fitting the
 nspp=200 #2/3 of total in our data
 nreps=5 #In the Jarzyna and Jetz material it sounded like there were actually 50 stops anwyays!
 elevsc<-c(scale(1:nsites)) #sets it so that sites are ordered from lowest to higest, and expressed in units of SD so from -1.6 yo 1.6 or so
-mu.a1<-0.4
-tau.a1<-0.3
-beta<-rnorm(nspp,mu.a1,tau.a1) #This is a scaled variable but represents change in occurrence probability with elevation
-# rho<-0.3
+mu_a1<-0.4
+tau_a1<-0.3
+
+rho_sim<-0.5
+tau_1<-1.1
+tau_2<-0.2
+psi_sim<-0.2
+theta_sim<-0.65
 # sd.occ<-1
 # av.occ<-0.5
 # sd.det<-1
@@ -77,30 +81,25 @@ beta<-rnorm(nspp,mu.a1,tau.a1) #This is a scaled variable but represents change 
 #covariance term
 
 
-abund<-rnorm(nspp, -1.5,.1) #make this smaller than beta
-#I think this is needed to serve as the intercept thing in the model and induce the detection/occupancy correlation
-#p.detect<-matrix(runif(nsites*nspp,0,1),nrow=nsites,ncol=nspp) #detection probs by site and species
-# consider treating this as a beta distribution so that there can be many rare spp and a few common
-# ones as is often the case in the real world
+species_intercepts<-rnorm(nspp, logit(psi_sim), tau_1) 
+beta_sim<-rnorm(nspp,mu_a1,tau_a1) #This is a scaled variable but represents change in occurrence probability with elevation
 
 #This is the actual simulated probability of occurences for each species at each site
 p.occur<-matrix(inv.logit #this is used to rescale everything to 0,1
                 (rnorm(n = nsites*nspp #I guess rnorm gives random deviates from the species beta *elevation, with sd 1
-                       #, mean=abund+ 
-                       , beta*matrix(elevsc 
+                    
+                       , beta_sim*matrix(elevsc 
                                      , nrow=nspp #each of these has an elevation attached, elevsc
                                      , ncol=nsites # I guess this simply recycles the elevation for each species, 
                                      # which each have their own overall (average) probability of detection given by the beta variable
-                       ))+abund)
+                       ))+species_intercepts)
                 ,nsites #i think this just means have sites as rows and species as columns
                 ,nspp)
 
-p.sum<-apply(p.occur, 2, sum)/50 #.
-min(p.sum) #0.3, still high
-max(p.sum) #0.6, not that much higher! Nothing has low occurence probability. Hmmm. 
-min(p.occur)
-max(p.occur)
-p.detect<-matrix(inv.logit(abund+runif(nspp,0,4)),nsites,nspp,byrow=T) 
+
+
+mean_detect <- logit(theta_sim) + (rho_sim*(1/sqrt(tau_1)) /(1/sqrt(tau_2)))*(species_intercepts-logit(psi_sim))
+p.detect<-matrix(inv.logit(rnorm(nsites*nspp, mean_detect, tau_2/(1-(rho_sim^2)))),nsites,nspp, byrow=T) 
 #wait, does this include the occupancy/detection correlation? I don't think so!
 # p.detect #detection does not vary between sites. It ranges from 
 
@@ -131,102 +130,102 @@ richtrue
 Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of presences at the "site" level, not the repeat observation level
 
 
-#########################################
-# different simulation, alternate process than the model in jaw_model
-
-#simulate a site x reps x spp array of occupancies (0,1) and test whether the model recovers it
-#and the underlying parameters
-
-nsites=50 #somewhere in the middle of the ecoregions for which we're fitting the model
-nspp=200 #2/3 of total in our data
-nreps=5
-elevsc<-c(scale(1:nsites)) #sets it so that sites are ordered from lowest to higest, and expressed in units of SD so from -1.6 yo 1.6 or so
-mu.a1<--3
-tau.a1<-2
-beta<-rnorm(nspp,mu.a1,tau.a1) #This is a scaled variable but represents change in occurrence probability with elevation
-# rho<-0.3
-# sd.occ<-1
-# av.occ<-0.5
-# sd.det<-1
-# av.det<-0.5
-#covariance term
-
-
-# abund<-rnorm(nspp, -4,3) #make this smaller than beta
-#I think this is needed to serve as the intercept thing in the model and induce the detection/occupancy correlation
-#p.detect<-matrix(runif(nsites*nspp,0,1),nrow=nsites,ncol=nspp) #detection probs by site and species
-# consider treating this as a beta distribution so that there can be many rare spp and a few common
-# ones as is often the case in the real world
-
-#This is the actual simulated probability of occurences for each species at each site
-p.occur<-matrix(inv.logit #this is used to rescale everything to 0,1
-                (rnorm(n = nsites*nspp #I guess rnorm gives random deviates from the species beta *elevation, with sd 1
-                       , mean = beta*t(matrix(elevsc 
-                                            , ncol = nsites #each of these has an elevation attached, elevsc
-                                            , nrow = nspp # I guess this simply recycles the elevation for each species, 
-                                             # which each have their own overall (average) probability of detection given by the beta variable
-                       ))
-                       , sd=0.1
-                )
-                )
-                ,nsites #i think this just means have sites as rows and species as columns
-                ,nspp)
-
-# apply(p.occur, 1, sum)
-# apply(p.occur, 2, sum)
+# #########################################
+# # different simulation, alternate process than the model in jaw_model
 # 
-# max(apply(p.detect, 1, sum))
-# max(apply(p.detect, 2, sum))
+# #simulate a site x reps x spp array of occupancies (0,1) and test whether the model recovers it
+# #and the underlying parameters
 # 
-# p.sum<-apply(p.occur, 2, sum) #.
-# min(p.sum) #0.3, still high
-# max(p.sum) #0.6, not that much higher! Nothing has low occurence probability. Hmmm. 
-# min(p.occur)
-# max(p.occur)
-tau.p1<-1
-tau.p2<-2
-p.site_off<-rnorm(nsites, mean=1, sd= tau.p1)
-p.spp_det<-rnorm(nspp, mean=2, sd=tau.p2)
-
-p.detect<-matrix(NA, nsites, nspp )
-for(sp in 1:nspp){
-  for(site in 1:nsites){
-    p.detect[site, sp]<-inv.logit(p.site_off[site]+p.spp_det[sp])
-  }
-}
-#wait, does this include the occupancy/detection correlation? I don't think so!
-# p.detect #detection does not vary between sites. It ranges from 
-# mean(p.detect)
-# mean(p.occur)
-# min(p.detect)  #0.12 to 
-# max(p.detect)  #0.87
-
-
-#There is much more variation between species in detection than there is in occurence, I think. 
-# This is probably bad for the model esp. b/c the covariate is on occurence
-Xtrue<-matrix(NA, nsites,nspp) #initialize the true occupancy array
-Xobs<-array(NA, dim=c(nsites,nreps,nspp))
-for(site in 1:nsites){ #fill Z with detections
-  for(spp in 1:nspp){
-    Xtrue[site,spp]<-rbinom(1,1,p.occur[site,spp]) #occupancy is 1 bernouli trial 
-    Xobs[site,,spp]<-rbinom(5,1,p.detect[site,spp]*Xtrue[site,spp]) #detection is 5 bernouli trials times occurence
-  }
-}
-
-siterich<-function(x){sum(x>0)}
-richobs<-apply(Xobs, MARGIN = 1, function(site){siterich(apply(site, MARGIN=2, siterich))})
-summary(richobs)
-Xtrue
-richtrue<-apply(Xtrue, MARGIN = 1, sum)
-summary(richtrue)
-siteocc<-apply(Xtrue, MARGIN = 2, sum)
-summary(siteocc)
-siteocc #not enough variation in species occupancy rates. 
-summary(richtrue-richobs)
-
-richobs
-richtrue
-Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of presences at the "site" level, not the repeat observation level
+# nsites=50 #somewhere in the middle of the ecoregions for which we're fitting the model
+# nspp=200 #2/3 of total in our data
+# nreps=5
+# elevsc<-c(scale(1:nsites)) #sets it so that sites are ordered from lowest to higest, and expressed in units of SD so from -1.6 yo 1.6 or so
+# mu.a1<--3
+# tau.a1<-2
+# beta<-rnorm(nspp,mu.a1,tau.a1) #This is a scaled variable but represents change in occurrence probability with elevation
+# # rho<-0.3
+# # sd.occ<-1
+# # av.occ<-0.5
+# # sd.det<-1
+# # av.det<-0.5
+# #covariance term
+# 
+# 
+# # abund<-rnorm(nspp, -4,3) #make this smaller than beta
+# #I think this is needed to serve as the intercept thing in the model and induce the detection/occupancy correlation
+# #p.detect<-matrix(runif(nsites*nspp,0,1),nrow=nsites,ncol=nspp) #detection probs by site and species
+# # consider treating this as a beta distribution so that there can be many rare spp and a few common
+# # ones as is often the case in the real world
+# 
+# #This is the actual simulated probability of occurences for each species at each site
+# p.occur<-matrix(inv.logit #this is used to rescale everything to 0,1
+#                 (rnorm(n = nsites*nspp #I guess rnorm gives random deviates from the species beta *elevation, with sd 1
+#                        , mean = beta*t(matrix(elevsc 
+#                                             , ncol = nsites #each of these has an elevation attached, elevsc
+#                                             , nrow = nspp # I guess this simply recycles the elevation for each species, 
+#                                              # which each have their own overall (average) probability of detection given by the beta variable
+#                        ))
+#                        , sd=0.1
+#                 )
+#                 )
+#                 ,nsites #i think this just means have sites as rows and species as columns
+#                 ,nspp)
+# 
+# # apply(p.occur, 1, sum)
+# # apply(p.occur, 2, sum)
+# # 
+# # max(apply(p.detect, 1, sum))
+# # max(apply(p.detect, 2, sum))
+# # 
+# # p.sum<-apply(p.occur, 2, sum) #.
+# # min(p.sum) #0.3, still high
+# # max(p.sum) #0.6, not that much higher! Nothing has low occurence probability. Hmmm. 
+# # min(p.occur)
+# # max(p.occur)
+# tau.p1<-1
+# tau.p2<-2
+# p.site_off<-rnorm(nsites, mean=1, sd= tau.p1)
+# p.spp_det<-rnorm(nspp, mean=2, sd=tau.p2)
+# 
+# p.detect<-matrix(NA, nsites, nspp )
+# for(sp in 1:nspp){
+#   for(site in 1:nsites){
+#     p.detect[site, sp]<-inv.logit(p.site_off[site]+p.spp_det[sp])
+#   }
+# }
+# #wait, does this include the occupancy/detection correlation? I don't think so!
+# # p.detect #detection does not vary between sites. It ranges from 
+# # mean(p.detect)
+# # mean(p.occur)
+# # min(p.detect)  #0.12 to 
+# # max(p.detect)  #0.87
+# 
+# 
+# #There is much more variation between species in detection than there is in occurence, I think. 
+# # This is probably bad for the model esp. b/c the covariate is on occurence
+# Xtrue<-matrix(NA, nsites,nspp) #initialize the true occupancy array
+# Xobs<-array(NA, dim=c(nsites,nreps,nspp))
+# for(site in 1:nsites){ #fill Z with detections
+#   for(spp in 1:nspp){
+#     Xtrue[site,spp]<-rbinom(1,1,p.occur[site,spp]) #occupancy is 1 bernouli trial 
+#     Xobs[site,,spp]<-rbinom(5,1,p.detect[site,spp]*Xtrue[site,spp]) #detection is 5 bernouli trials times occurence
+#   }
+# }
+# 
+# siterich<-function(x){sum(x>0)}
+# richobs<-apply(Xobs, MARGIN = 1, function(site){siterich(apply(site, MARGIN=2, siterich))})
+# summary(richobs)
+# Xtrue
+# richtrue<-apply(Xtrue, MARGIN = 1, sum)
+# summary(richtrue)
+# siteocc<-apply(Xtrue, MARGIN = 2, sum)
+# summary(siteocc)
+# siteocc #not enough variation in species occupancy rates. 
+# summary(richtrue-richobs)
+# 
+# richobs
+# richtrue
+# Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of presences at the "site" level, not the repeat observation level
 
 #######################Run the model
 nburn = 5000
@@ -235,7 +234,7 @@ nchains = 3 #I learned to do at least 3 to assess convergence
 thin = 10 # These are J&J settings
 
 ###Specify the parameters to be monitored
-sp.params = as.character(list( "beta", "psi", "Z", "p.mean", "p.site", "u.mean", "p.fit", "p.fitnew"))
+sp.params = as.character(list("psi.mean", "theta.mean", "rho", "psi", "mu.theta", "p.fit", "p.fitnew"))
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
 #beta is the species-specific elevation sensitivities
@@ -275,42 +274,54 @@ sp.inits = function() {
 
 #I think this will fit the model, I think it will do the chains in series lets see if I can find how I did it in parallel
 #trying with R2jags::jags.parallel,b ut this meansa  different models epcificiation
-source("Multisp_model_dev3.R")
-
-ocmod2 <- jags.parallel(data = sp.data
-                       , inits = sp.inits
-                       , parameters.to.save = sp.params
-                       , model.file = Jarzyna_offset
-                       # have to include object names to export to cluster, 
-                       # I determined the membership of this list by trial and error message
-                       
-                       , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs") 
-                       , n.chains = nchains
-                       , n.iter = niter
-                       , n.burnin = nburn
-                       , n.thin = thin
-) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
-
-sp.params_nest = as.character(list( "beta", "psi", "Z", "p.mean", "u.mean", "p.fit", "p.fitnew"))
-ocmod_nest <- jags.parallel(data = sp.data
-                        , inits = sp.inits
-                        , parameters.to.save = sp.params_nest
-                        , model.file = Jarzyna_nested
-                        # have to include object names to export to cluster, 
-                        # I determined the membership of this list by trial and error message
-                        
-                        , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs") 
-                        , n.chains = nchains
-                        , n.iter = niter
-                        , n.burnin = nburn
-                        , n.thin = thin
-) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
+# source("Multisp_model_dev3.R")
+# 
+# ocmod2 <- jags.parallel(data = sp.data
+#                        , inits = sp.inits
+#                        , parameters.to.save = sp.params
+#                        , model.file = Jarzyna_offset
+#                        # have to include object names to export to cluster, 
+#                        # I determined the membership of this list by trial and error message
+#                        
+#                        , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs") 
+#                        , n.chains = nchains
+#                        , n.iter = niter
+#                        , n.burnin = nburn
+#                        , n.thin = thin
+# ) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
+# 
+# sp.params_nest = as.character(list( "beta", "psi", "Z", "p.mean", "u.mean", "p.fit", "p.fitnew"))
+# ocmod_nest <- jags.parallel(data = sp.data
+#                         , inits = sp.inits
+#                         , parameters.to.save = sp.params_nest
+#                         , model.file = Jarzyna_nested
+#                         # have to include object names to export to cluster, 
+#                         # I determined the membership of this list by trial and error message
+#                         
+#                         , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs") 
+#                         , n.chains = nchains
+#                         , n.iter = niter
+#                         , n.burnin = nburn
+#                         , n.thin = thin
+# ) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
 # ocmod <- jags.model(file = "Multisp_model_dev3.txt"
 #                     , inits = sp.inits
 #                     , data = sp.data
 #                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
+
+JJocmod<-jags.parallel(data = sp.data
+                                              , inits = sp.inits
+                                              , parameters.to.save = sp.params
+                                              , model.file = jaw_model
+                                              # have to include object names to export to cluster,
+                                              , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs")
+                                              , n.chains = nchains
+                                              , n.iter = niter
+                                              , n.burnin = nburn
+                                              , n.thin = thin
+)
 
 traceplot(ocmod, varname="beta") #I think this might not be convergence, seems like it's bucking about wildly.
 #I don't think the update is paralllelized.
