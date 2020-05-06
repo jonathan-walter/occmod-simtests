@@ -43,12 +43,15 @@ rm(list=ls())
 
 library(rjags)
 library(coda)
-library(stringr)
+# library(stringr)
 
-library(R2jags) #I added this one for jags.paralllel which lets you run the mcmc chains in parallel
-library(mcmcse)
+# library(R2jags) #I added this one for jags.paralllel which lets you run the mcmc chains in parallel
+# library(mcmcse)
 library(tictoc)
 library(tidyverse)
+library(dclone)
+source("MCMC_tools.R")
+library(saveJAGS)
 
 logit<-function(x){
   return(log(x/(1-x)))
@@ -61,7 +64,7 @@ inv.logit<-function(x){
 ## Create simulations to test performance of model 
 ####################################
 # to match J&J perfectly
-
+set.seed(1614)
 nsites=50 #somewhere in the middle of the ecoregions for which we're fitting the model
 nspp=200 #2/3 of total in our data
 nreps=5 #In the Jarzyna and Jetz material it sounded like there were actually 50 stops anwyays!
@@ -87,11 +90,11 @@ beta_sim<-rnorm(nspp,mu_a1,tau_a1) #This is a scaled variable but represents cha
 #This is the actual simulated probability of occurences for each species at each site
 p.occur<-matrix(inv.logit #this is used to rescale everything to 0,1
                 (rnorm(n = nsites*nspp #I guess rnorm gives random deviates from the species beta *elevation, with sd 1
-                    
+                       
                        , beta_sim*matrix(elevsc 
-                                     , nrow=nspp #each of these has an elevation attached, elevsc
-                                     , ncol=nsites # I guess this simply recycles the elevation for each species, 
-                                     # which each have their own overall (average) probability of detection given by the beta variable
+                                         , nrow=nspp #each of these has an elevation attached, elevsc
+                                         , ncol=nsites # I guess this simply recycles the elevation for each species, 
+                                         # which each have their own overall (average) probability of detection given by the beta variable
                        ))+species_intercepts)
                 ,nsites #i think this just means have sites as rows and species as columns
                 ,nspp)
@@ -229,12 +232,12 @@ Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of 
 
 #######################Run the model
 nburn = 5000
-niter = 2e4
+niter = 1e4
 nchains = 3 #I learned to do at least 3 to assess convergence
 thin = 10 # These are J&J settings
 
 ###Specify the parameters to be monitored
-sp.params = as.character(list("psi.mean", "theta.mean", "rho", "psi", "mu.theta", "p.fit", "p.fitnew"))
+sp.params = as.character(list("psi.mean", "theta.mean", "rho", "psi", "mu.theta"))
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
 #beta is the species-specific elevation sensitivities
@@ -254,10 +257,10 @@ sp.data = list(nspp=nspp, nsite=nsites, nrep=rep(nreps,nsites), X=Xobs, elev=ele
 
 # Set 1 - this set of initial values has proven effective, so I'll be using these
 #MR: proven effective as in in your own experiments?
-sp.inits = function() {
+sp.inits = function(chain) {
   
-  list(beta.mean= runif(1,0.001,0.99),  u.mean= runif(1,0.001,0.99), #mu.theta=runif(1,0.001,0.99),
-       p.mean = runif(1,0.001,0.99), p.site = runif(1,0.001,0.99),
+  list(beta= runif(1,0.001,0.99),  psi.mean= runif(1,0.001,0.99), 
+       mu.alpha1 = runif(1,0.001,0.99),
        Z = Zobs)
 }
 
@@ -274,7 +277,7 @@ sp.inits = function() {
 
 #I think this will fit the model, I think it will do the chains in series lets see if I can find how I did it in parallel
 #trying with R2jags::jags.parallel,b ut this meansa  different models epcificiation
-# source("Multisp_model_dev3.R")
+source("Multisp_model_dev3.R")
 # 
 # ocmod2 <- jags.parallel(data = sp.data
 #                        , inits = sp.inits
@@ -310,25 +313,62 @@ sp.inits = function() {
 #                     , data = sp.data
 #                     , n.chains = n.chains) #~/Documents/Research/DATA/BBS/DetectionCorrection/Multisp_model_dev3.txt")
 
+###########################
+# fit using dclone and rjags, touch and go with memory
 
-JJocmod<-jags.parallel(data = sp.data
-                                              , inits = sp.inits
-                                              , parameters.to.save = sp.params
-                                              , model.file = jaw_model
-                                              # have to include object names to export to cluster,
-                                              , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs")
-                                              , n.chains = nchains
-                                              , n.iter = niter
-                                              , n.burnin = nburn
-                                              , n.thin = thin
-)
+# tic()
+# cl<-makeForkCluster(3)
+# JJocmod<-jags.parfit(cl
+#                      , data = sp.data
+#                      , inits = sp.inits
+#                      , params = sp.params
+#                      , model = jaw_model
+#                      # have to include object names to export to cluster,
+#                      , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs")
+#                      , n.chains = nchains
+#                      , n.iter = niter
+#                      , n.burnin = nburn
+#                      , n.thin = thin
+#                      , verbose =T
+# )
 
-traceplot(ocmod, varname="beta") #I think this might not be convergence, seems like it's bucking about wildly.
+# stopCluster(cl)
+# save(JJocmod, file="JJ_modfit.RData")
+# toc()
+
+#############################
+# try with new package saveJAGS
+
+dir.create("model_out")
+trysaveJAGS<-saveJAGS( data = sp.data
+                       , inits = sp.inits
+                       , params = sp.params
+                       , modelFile = "modtext.txt"
+                       , chains = nchains
+                       , sample2save = 500
+                       , nSaves =10
+                       # have to include object names to export to cluster,
+                       # , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs")
+                       , burnin = nburn
+                       , thin = thin
+                       , fileStub = "model_out/first_saveJAGS"
+                       # , verbose =T
+            )
+
+# res<-recoverSaves("first_saveJAGS")
+# setwd("/Rstudio_Git/occmod-simtests/")
+# load("JJ_modfit.RData")
+traceplot(JJocmod, varname="beta") #I think this might not be convergence, seems like it's bucking about wildly.
 #I don't think the update is paralllelized.
-recompile(ocmod2)
+recompile(JJocmod)
 tic()
-is_upd_parll<-autojags(ocmod2, n.update=150, parallel=T, verbose=T)
-toc() #this took about 2 minutes and I think it did 3 chains for whatever number of iterations 2 times. 
+is_upd_parll<-autojags(JJocmod, n.update=150, parallel=T, verbose=T)
+toc() #
+
+
+gelman.diag(JJocmod)
+
+plotPost(JJocmod$psi.mean)
 
 # looking at traceplots I'm not clear that we have convergence.
 traceplot(is_upd_parll, varname="psi.mean") #also look at thetas, 
@@ -395,7 +435,7 @@ ocmod.df
 plotPost(ocmod.df$psi[1,1]) #this produced a pretty histogram
 
 plotPost(ocmod.df$p.mean)
-2mean(p.occur) #model underestimates
+mean(p.occur) #model underestimates
 plotPost(ocmod.df$theta.mean)
 mean(p.detect) #pretty darn close, slightly underestimates
 

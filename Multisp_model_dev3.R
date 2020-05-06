@@ -91,6 +91,76 @@ jaw_model<-function() {
 }
 
 
+writeLines(c("model {"
+   
+    ,"psi.mean ~ dunif(0.001,0.99)" #vague prior for the hyperparameter of the community-level occupancy covariates"
+   
+    
+    ,"a <- log(psi.mean) - log(1-psi.mean) "# logit transformation"
+    
+   ," theta.mean ~ dunif(0.001,0.99)" #vague prior for the hyperparameter of the community-level detection covariates",
+    
+   ," b <- log(theta.mean) - log(1-theta.mean)"
+    
+   , " mu.alpha1 ~ dnorm(0, 0.01) "#site-level occupancy average",    
+    
+    ,"tau1 ~ dgamma(10,1) ",
+    
+    "tau2 ~ dgamma(10,1)",
+    
+    
+   " tau.alpha1 ~ dgamma(10,1)" #Zipkin's original priors #see if we can track down this code.",
+   
+    ,"rho ~ dunif(-0.99,0.99) "#correlation between occupancy and detection at the species level (nothing to do with site characteristics, i think)
+    
+  , "var.v <- tau2 / (1-(rho^2))",
+   "sigma1 <- 1/sqrt(tau1) 
+    ",
+   "sigma2 <- 1/sqrt(tau2)"
+    
+    ,"for (i in 1:nspp) {"
+       , " u[i] ~ dnorm(a, tau1) "
+        
+        ,"mu.v[i] <- b + (rho*sigma2 /sigma1)*(u[i]-a)" #average detectability correlated with occurence proability u[i]
+       
+        
+        ,"v[i] ~ dnorm(mu.v[i], var.v)" #v[i]  (Species-level detection probability)
+      
+       , "alpha1[i] ~ dnorm(mu.alpha1, tau.alpha1)" # this is beta! confusing that alpha is beta!
+    
+        ,"for (j in 1:nsite) {"
+          ,"  logit(psi[j,i]) <- u[i] + alpha1[i]*elev[j]" #occupancy probability (psi[j,i]) 
+            ,"mu.psi[j,i] <- psi[j,i]" #i don't yet know why this occurs"
+            ,"Z[j,i] ~ dbin(psi[j,i], 1)" #Z is generally not observed with certainty, instead"
+            
+           ,"for (k in 1:nrep[j]) {" 
+                ,"logit(theta[j,k,i]) <- v[i]"  #we observed data theta[i,j,k] for species i at site j during sampling period k "
+                ,"mu.theta[j,k,i] <- theta[j,k,i]*Z[j,i]" #multiply by indicator (1 if occupied)"
+               ," X[j,k,i] ~ dbin(mu.theta[j,k,i], 1)"  # so mu.theta is the detection parameter"
+               
+               
+                ,"Xnew[j,k,i] ~ dbin(mu.theta[j,k,i], 1)" 
+               
+                ,"d[j,k,i] <- abs(X[j,k,i] - mu.theta[j,k,i])" #difference between observation and detection*occupancy (expected)
+                ,"dnew[j,k,i] <- abs(Xnew[j,k,i] - mu.theta[j,k,i])" # difference between observation in alternate universe and expected
+                ,"d2[j,k,i] <- pow(d[j,k,i],2)" #square differences
+                ,"dnew2[j,k,i] <- pow(dnew[j,k,i],2) " 
+            ,"}"
+            ,"dsum[j,i] <- sum(d2[j,1:nrep[j],i])"
+            ,"dnewsum[j,i] <- sum(dnew2[j,1:nrep[j],i])" 
+        ,"}"
+    ,"}"
+    ,"p.fit <- sum(dsum[1:nsite,1:nspp])" 
+    ,"p.fitnew <- sum(dnewsum[1:nsite,1:nspp])" #this is driven by nrep(j) and the detection probablities... what does it tell us?
+    
+   
+    ,"for(i in 1:nspp) {"
+       ," occ_sp[i] <- sum(Z[1:nsite,i])/nsite" 
+   ," }"
+   
+,"}"), "modtext.txt")
+
+
 Jarzyna_offset<-function() {
     #Prior distributions on the community level occupancy
     #and detection covariates
