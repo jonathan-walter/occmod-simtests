@@ -69,14 +69,14 @@ nsites=50 #somewhere in the middle of the ecoregions for which we're fitting the
 nspp=200 #2/3 of total in our data
 nreps=5 #In the Jarzyna and Jetz material it sounded like there were actually 50 stops anwyays!
 elevsc<-c(scale(1:nsites)) #sets it so that sites are ordered from lowest to higest, and expressed in units of SD so from -1.6 yo 1.6 or so
-mu_a1<-0.4
+mu_a1<-0.9 #0.4
 tau_a1<-0.3
 
-rho_sim<-0.5
+rho_sim<-0.8#0.5
 tau_1<-1.1
 tau_2<-0.2
 psi_sim<-0.2
-theta_sim<-0.65
+theta_sim<-0.5#0.65
 # sd.occ<-1
 # av.occ<-0.5
 # sd.det<-1
@@ -231,13 +231,12 @@ Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of 
 # Zobs<-apply(Xobs,c(1,3),function(x){as.numeric(any(x==1))}) #Z is the matrix of presences at the "site" level, not the repeat observation level
 
 #######################Run the model
-nburn = 5000
+nburn = 1e4
 niter = 1e4
 nchains = 3 #I learned to do at least 3 to assess convergence
 thin = 10 # These are J&J settings
 
 ###Specify the parameters to be monitored
-sp.params = as.character(list("psi.mean", "theta.mean", "rho", "psi", "mu.theta"))
 # sp.params = list("mu.psi")
 #Z matrix will store occupancy state
 #beta is the species-specific elevation sensitivities
@@ -251,6 +250,7 @@ sp.params = as.character(list("psi.mean", "theta.mean", "rho", "psi", "mu.theta"
 
 
 sp.data = list(nspp=nspp, nsite=nsites, nrep=rep(nreps,nsites), X=Xobs, elev=elevsc)
+sp.params = as.character(list("psi.mean", "theta.mean", "rho", "psi", "mu.theta", "mu.alpha1", "tau.alpha1", "alpha", "p.fit", "p.fitnew", "v"))
 
 #######################Specify the initial values
 
@@ -338,28 +338,78 @@ source("Multisp_model_dev3.R")
 
 #############################
 # try with new package saveJAGS
-
+# unlink("model_out/", recursive=T)
 dir.create("model_out")
+#try again, prob not enough mixing. 
 trysaveJAGS<-saveJAGS( data = sp.data
                        , inits = sp.inits
                        , params = sp.params
                        , modelFile = "modtext.txt"
                        , chains = nchains
                        , sample2save = 500
-                       , nSaves =10
+                       , nSaves =150
                        # have to include object names to export to cluster,
                        # , export_obj_names = list("nburn", "niter", "nchains", "thin", "Zobs")
                        , burnin = nburn
                        , thin = thin
-                       , fileStub = "model_out/first_saveJAGS"
+                       , fileStub = "model_out/firstsaveJAGS"
                        # , verbose =T
             )
 
 # res<-recoverSaves("first_saveJAGS")
 # setwd("/Rstudio_Git/occmod-simtests/")
 # load("JJ_modfit.RData")
-traceplot(JJocmod, varname="beta") #I think this might not be convergence, seems like it's bucking about wildly.
+# traceplot(JJocmod, varname="beta") #I think this might not be convergence, seems like it's bucking about wildly.
 #I don't think the update is paralllelized.
+# shit  bad fileStub
+
+file.rename(paste0("model_out/",list.files("model_out",pattern="first_save*")), paste0("model_out/",gsub("first_save", "firstsave",list.files("model_out", pattern="first_save*"))))
+# file.rename(paste0("model_out/",list.files("model_out")), paste0("model_out/",gsub("[/*]", "",list.files("model_out"))))
+
+
+getmods<-recoverSaves(fileStub = "model_out/firstsaveJAGS")
+
+just_rho<- as.mcmc.list(getmods, params="rho", thin=10)
+plot(just_rho)
+rho_sim
+#kind of a major underestimate- predicts slight negative correlation, but in fact decently positive... 
+#and just upped it for second simulation, need to check that rho in the model is on the same scale as the simulation!
+rm(just_rho)
+
+just_psi.mean<-as.mcmc.list(getmods,  
+                            params="psi.mean", thin=10)
+plot(just_psi.mean)
+psi_sim
+#this is outside the window of the coda density plot!
+rm(just_psi.mean)
+
+
+
+just_theta.mean<-as.mcmc.list(getmods, params="theta.mean", thin=10)
+plot(just_theta.mean)
+theta_sim
+# too high, but not by what seems like a lot
+rm(just_theta.mean)
+
+
+just_mu.alpha1<-as.mcmc.list(getmods, params="mu.alpha1", thin=10)
+plot(just_mu.alpha1)
+
+#way low.
+mu_a1
+# too high, but not by what seems like a lot
+rm(just_mu.alpha1)
+
+
+### overall, these param values weren't very well gotten by model! Let's see what p.fit and pfitnew are
+
+just_p.fit<-as.mcmc.list(getmods, params=c("p.fit", "p.fitnew"), thin=10)
+plot(just_p.fit)
+theta_sim
+# too high, but not by what seems like a lot
+rm(just_theta.mean)
+
+
 recompile(JJocmod)
 tic()
 is_upd_parll<-autojags(JJocmod, n.update=150, parallel=T, verbose=T)
