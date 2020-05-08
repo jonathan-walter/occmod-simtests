@@ -369,7 +369,7 @@ file.rename(paste0("model_out/",list.files("model_out",pattern="first_save*")), 
 
 getmods<-recoverSaves(fileStub = "model_out/firstsaveJAGS")
 
-just_rho<- as.mcmc.list(getmods, params="rho", thin=10)
+just_rho<- as.mcmc.list(getmods, params="rho", thin=100)
 plot(just_rho)
 rho_sim
 #kind of a major underestimate- predicts slight negative correlation, but in fact decently positive... 
@@ -377,7 +377,7 @@ rho_sim
 rm(just_rho)
 
 just_psi.mean<-as.mcmc.list(getmods,  
-                            params="psi.mean", thin=10)
+                            params="psi.mean", thin=100)
 plot(just_psi.mean)
 psi_sim
 #this is outside the window of the coda density plot!
@@ -385,7 +385,7 @@ rm(just_psi.mean)
 
 
 
-just_theta.mean<-as.mcmc.list(getmods, params="theta.mean", thin=10)
+just_theta.mean<-as.mcmc.list(getmods, params="theta.mean", thin=100)
 plot(just_theta.mean)
 theta_sim
 # too high, but not by what seems like a lot
